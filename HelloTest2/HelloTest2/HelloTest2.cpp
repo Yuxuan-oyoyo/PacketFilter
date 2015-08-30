@@ -249,12 +249,21 @@ DWORD PacketFilter::AddRemoveFilter(bool bAdd)
 		{
 			FWPM_FILTER0 filter = { 0 };
 
-
+			// setup the filter
 			filter.displayData.name = L"WFPSampler's basic scenario filter";
 			filter.flags = FWPM_FILTER_FLAG_NONE;
 			filter.layerKey = FWPM_LAYER_INBOUND_TRANSPORT_V4;
 			filter.subLayerKey = m_subLayerGUID;
+			filter.weight.type = FWP_UINT8;
+			filter.weight.uint8 = 0xf;
+			filter.numFilterConditions = 0;
+			filter.filterCondition = 0;
+			filter.action.type = FWP_ACTION_CALLOUT_INSPECTION;
 
+			dwFwAPiRetCode = ::FwpmFilterAdd0(m_hEngineHandle,
+								&filter,
+								NULL,
+								NULL);
 		}
 	}
 	catch (...)
