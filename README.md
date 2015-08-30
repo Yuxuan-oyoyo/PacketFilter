@@ -1,2 +1,0 @@
-# PacketFilter
-Windows filtering platform
