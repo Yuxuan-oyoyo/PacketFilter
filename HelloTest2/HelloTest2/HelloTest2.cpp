@@ -32,7 +32,7 @@ PacketFilter::~PacketFilter()
 {
 	try
 	{
-		StopFirewall();
+		StopPacketSniffer();
 	}
 	catch (...)
 	{
@@ -228,9 +228,43 @@ DWORD PacketFilter::CreateDeleteInterface(bool bCreate)
 	return dwFwAPIRetCode;
 
 }
+/*
+	AddRemoveFilter
+	try
+		if(true)
+			add filters
+		else 
+			delete filters
+	catch
+
+*/
+
+DWORD PacketFilter::AddRemoveFilter(bool bAdd)
+{
+	DWORD dwFwAPiRetCode = ERROR_BAD_COMMAND;
+
+	try
+	{
+		if (bAdd)
+		{
+			FWPM_FILTER0 filter = { 0 };
 
 
-BOOL PacketFilter::StartFirewall()
+			filter.displayData.name = L"WFPSampler's basic scenario filter";
+			filter.flags = FWPM_FILTER_FLAG_NONE;
+			filter.layerKey = FWPM_LAYER_INBOUND_TRANSPORT_V4;
+			filter.subLayerKey = m_subLayerGUID;
+
+		}
+	}
+	catch (...)
+	{	}
+	
+	return dwFwAPiRetCode;
+}
+
+
+BOOL PacketFilter::StartPacketSniffer()
 {
 
 	BOOL bStarted = FALSE;
@@ -244,7 +278,7 @@ BOOL PacketFilter::StartFirewall()
 			if (BindUnbindInterface(true) == ERROR_SUCCESS)
 			{
 				printf("\Start Firewall 2\n");
-				//AddRemoveFilter(true);
+				AddRemoveFilter(true);
 				bStarted = TRUE;
 			}
 		}
@@ -255,7 +289,7 @@ BOOL PacketFilter::StartFirewall()
 	return bStarted;
 }
 
-BOOL PacketFilter::StopFirewall()
+BOOL PacketFilter::StopPacketSniffer()
 {
 	BOOL bSTopped = FALSE;
 
@@ -270,17 +304,16 @@ int main()
 
 	PacketFilter pktFilter;
 
-	
+
 	//pktFilter.AddToBlockList("192.167.0.1");
 
-
-	if (pktFilter.StartFirewall())
+	if (pktFilter.StartPacketSniffer())
 	{
-		printf("\nFirewall started.. \n");
+		printf("\nNetwork Sniffer started.. \n");
 	}
 	else
 	{
-		printf("\nError starting firewall. GetLastError() 0x%x", ::GetLastError());
+		printf("\nError starting the Network sniffer. GetLastError() 0x%x", ::GetLastError());
 	}
 	
 

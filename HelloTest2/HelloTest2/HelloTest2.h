@@ -90,10 +90,10 @@ class PacketFilter
 		void AddToBlockList(char* szIpAddrToBlock);
 
 		// method to start packet filter
-		BOOL StartFirewall();
+		BOOL StartPacketSniffer();
 
 		// method to stop packet filter
-		BOOL StopFirewall();
+		BOOL StopPacketSniffer();
 };
 
 
