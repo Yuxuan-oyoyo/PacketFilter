@@ -284,24 +284,30 @@ DWORD PacketFilter::AddTcpFilter(bool bAdd)
 					*/
 
 					FWPM_FILTER0 Filter = { 0 };
-					FWPM_FILTER_CONDITION0 Condition = { 0 };
+					FWPM_FILTER_CONDITION0 Condition[2] = { 0 };
 					FWP_V4_ADDR_AND_MASK AddrMask = { 0 };
 
 					// Prepare filter condition.
 					Filter.subLayerKey = m_subLayerGUID;
 					Filter.displayData.name = L"CUSTOM_TCP_FILTER";
 					Filter.flags = FWPM_FILTER_FLAG_NONE;
-					Filter.layerKey = FWPM_LAYER_INBOUND_TRANSPORT_V4;
+					Filter.layerKey = FWPM_LAYER_INBOUND_TRANSPORT_V4; //inbound transport includes both tcp and icmp and who knows what else. we block tcp as a filter condition.
 					Filter.action.type = FWP_ACTION_BLOCK;
 					Filter.weight.type = FWP_EMPTY;
-					Filter.filterCondition = &Condition;
-					Filter.numFilterConditions = 1;
+					Filter.filterCondition = Condition;
+					Filter.numFilterConditions = 2;
 
 					// Remote IP address should match itFilters->uHexAddrToBlock.
-					Condition.fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
-					Condition.matchType = FWP_MATCH_EQUAL;
-					Condition.conditionValue.type = FWP_V4_ADDR_MASK;
-					Condition.conditionValue.v4AddrMask = &AddrMask;
+					Condition[0].fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
+					Condition[0].matchType = FWP_MATCH_EQUAL;
+					Condition[0].conditionValue.type = FWP_V4_ADDR_MASK;
+					Condition[0].conditionValue.v4AddrMask = &AddrMask;
+
+					// Block only TCP.
+					Condition[1].fieldKey = FWPM_CONDITION_IP_PROTOCOL;
+					Condition[1].matchType = FWP_MATCH_EQUAL;
+					Condition[1].conditionValue.type = FWP_UINT8;
+					Condition[1].conditionValue.uint8 = IPPROTO_TCP;
 
 					// Add IP address to be blocked.
 					AddrMask.addr = itFilters->uHexAddrToBlock;
@@ -408,24 +414,33 @@ DWORD PacketFilter::AddIcmpFilter(bool bAdd)
 				{
 
 					FWPM_FILTER0 Filter = { 0 };
-					FWPM_FILTER_CONDITION0 Condition = { 0 };
+					FWPM_FILTER_CONDITION0 Condition[2] = { 0 };
 					FWP_V4_ADDR_AND_MASK AddrMask = { 0 };
 
 					// Prepare filter condition.
 					Filter.subLayerKey = m_subLayerGUID;
 					Filter.displayData.name = L"CUSTOM_ICMP_FILTER";
 					Filter.flags = FWPM_FILTER_FLAG_NONE;
-					Filter.layerKey = FWPM_LAYER_OUTBOUND_ICMP_ERROR_V4;
+					Filter.layerKey = FWPM_LAYER_INBOUND_TRANSPORT_V4;
 					Filter.action.type = FWP_ACTION_BLOCK;
-					Filter.weight.type = FWP_EMPTY;
-					Filter.filterCondition = &Condition;
-					Filter.numFilterConditions = 1;
+					Filter.weight.type = FWP_UINT64;
+					UINT64 maxweight = FWPM_AUTO_WEIGHT_MAX;
+					Filter.weight.uint64 = &maxweight;
+					Filter.filterCondition = Condition;
+					Filter.numFilterConditions = 2;
 
 					// Remote IP address should match itFilters->uHexAddrToBlock.
-					Condition.fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
-					Condition.matchType = FWP_MATCH_EQUAL;
-					Condition.conditionValue.type = FWP_V4_ADDR_MASK;
-					Condition.conditionValue.v4AddrMask = &AddrMask;
+					Condition[0].fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
+					Condition[0].matchType = FWP_MATCH_EQUAL;
+					Condition[0].conditionValue.type = FWP_V4_ADDR_MASK;
+					Condition[0].conditionValue.v4AddrMask = &AddrMask;
+
+					// Block only TCP.
+					Condition[1].fieldKey = FWPM_CONDITION_IP_PROTOCOL;
+					Condition[1].matchType = FWP_MATCH_EQUAL;
+					Condition[1].conditionValue.type = FWP_UINT8;
+					Condition[1].conditionValue.uint8 = IPPROTO_ICMP;
+
 
 					// Add IP address to be blocked.
 					AddrMask.addr = itFilters->uHexAddrToBlock;
@@ -463,12 +478,35 @@ BOOL PacketFilter::StartPacketSniffer(bool tcp, bool rst, bool icmp)
 			if (BindUnbindInterface(true) == ERROR_SUCCESS)
 			{
 				printf("Start Firewall 2\n");
-				if (tcp)
+				if (tcp) {
+					puts("adding tcp filter");
 					AddTcpFilter(true);
+				}
 				if (rst)
+				{
+					puts("adding rst filter");
 					AddRstFilter(true);
+				}
 				if (icmp)
-					AddIcmpFilter(true);
+				{
+					puts("adding icmp filter");
+					DWORD penis = AddIcmpFilter(true);
+					if (penis != ERROR_SUCCESS)
+					{
+						printf("\nICMP penis failed (%d).\n", penis);
+
+						LPSTR messageBuffer = nullptr;
+						size_t size = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+							NULL, penis, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&messageBuffer, 0, NULL);
+
+						std::string message(messageBuffer, size);
+
+						//Free the buffer.
+						LocalFree(messageBuffer);
+
+						printf("\n %s .", message.c_str());
+					}
+				}
 				bStarted = TRUE;
 			}
 		}
@@ -495,7 +533,8 @@ int main(int argc, char** argv)
 			" \nDebinPacketFilter 192.168.13.37 -tcp -rst -icmp \n" \
 			"   -tcp   Normal TCP block\n" \
 			"   -rst   RST block\n" \
-			"   -icmp  ICMP block\n");
+			"   -icmp  ICMP block\n" \
+			"   -all   Block all\n");
 		return 0;
 	}
 	// Didn't bother with error checking
@@ -513,6 +552,9 @@ int main(int argc, char** argv)
 		}
 		else if (strcmp(argv[i], "-icmp") == 0) {
 			icmp = true;
+		}
+		else if (strcmp(argv[i], "-all") == 0) {
+			tcp = rst = icmp = true;
 		}
 	}
 	printf("\nThe settings you have specified are: ip = %s, tcp = %d, rst = %d, icmp = %d\n", ip, tcp, rst, icmp);
