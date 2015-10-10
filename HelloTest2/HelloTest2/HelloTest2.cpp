@@ -41,7 +41,7 @@ PacketFilter::~PacketFilter()
 
 /*
 	ParseIPAddrString is a utility method
-	This method was not written by our team and copied from an online source
+	This method was not written by our team 
 */
 bool PacketFilter::ParseIPAddrString(char* szIpAddr, UINT nStrLen, BYTE* pbHostOrdr, UINT nByteLen, ULONG& uHexAddr)
 {
@@ -140,7 +140,7 @@ DWORD PacketFilter::BindUnbindInterface(bool bBind)
 			rpcStatus = ::UuidCreate(&SubLayer.subLayerKey);
 
 			// need to add "Fwpuclnt.lib Rpcrt4.lib" to Linker
-			printf("\nUnbind break 2\n");
+
 			if (rpcStatus == NO_ERROR)
 			{
 
@@ -151,7 +151,6 @@ DWORD PacketFilter::BindUnbindInterface(bool bBind)
 				
 				// FWPM_ACTRL_ADD_LINK
 
-				printf("\nUnbind Break 3\n");
 				// Populate packet filter layer information.
 				SubLayer.displayData.name = L"MyFirewallSublayer";
 				SubLayer.displayData.description = L"My filter sublayer";
@@ -164,8 +163,19 @@ DWORD PacketFilter::BindUnbindInterface(bool bBind)
 				if (dwFwAPIRETCode != ERROR_SUCCESS)
 				{
 					printf("\nFwpmSubLayerAdd failed (%d).\n", dwFwAPIRETCode);
+
+					LPSTR messageBuffer = nullptr;
+					size_t size = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+						NULL, dwFwAPIRETCode, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&messageBuffer, 0, NULL);
+
+					std::string message(messageBuffer, size);
+
+					//Free the buffer.
+					LocalFree(messageBuffer);
+
+					printf("\n %s .", message.c_str());
 				}
-				printf("\nUnbind Break 4\n");
+
 			}
 		}
 		else
@@ -228,7 +238,7 @@ DWORD PacketFilter::CreateDeleteInterface(bool bCreate)
 	return dwFwAPIRetCode;
 
 }
-/*
+	/*
 	AddRemoveFilter
 	try
 		if(true)
@@ -236,8 +246,7 @@ DWORD PacketFilter::CreateDeleteInterface(bool bCreate)
 		else 
 			delete filters
 	catch
-
-*/
+	*/
 
 DWORD PacketFilter::AddRemoveFilter(bool bAdd)
 {
@@ -247,23 +256,65 @@ DWORD PacketFilter::AddRemoveFilter(bool bAdd)
 	{
 		if (bAdd)
 		{
-			FWPM_FILTER0 filter = { 0 };
+			if (m_lstFilters.size())
+			{
+				IPFILTERINFOLIST::iterator itFilters;
+				for (itFilters = m_lstFilters.begin(); itFilters != m_lstFilters.end(); itFilters++)
+				{
+					//FWPM_FILTER0 filter = { 0 };
+					/*
+					// setup the filter
+					filter.displayData.name = L"WFPSampler's basic scenario filter";
+					filter.flags = FWPM_FILTER_FLAG_NONE;
+					filter.layerKey = FWPM_LAYER_INBOUND_TRANSPORT_V4;
+					filter.subLayerKey = m_subLayerGUID;
+					filter.weight.type = FWP_UINT8;
+					filter.weight.uint8 = 0xf;
+					filter.numFilterConditions = 0;
+					filter.filterCondition = 0;
+					//filter.action.type = FWP_ACTION_CALLOUT_INSPECTION;
+					filter.action.type = FWP_ACTION_BLOCK;
 
-			// setup the filter
-			filter.displayData.name = L"WFPSampler's basic scenario filter";
-			filter.flags = FWPM_FILTER_FLAG_NONE;
-			filter.layerKey = FWPM_LAYER_INBOUND_TRANSPORT_V4;
-			filter.subLayerKey = m_subLayerGUID;
-			filter.weight.type = FWP_UINT8;
-			filter.weight.uint8 = 0xf;
-			filter.numFilterConditions = 0;
-			filter.filterCondition = 0;
-			filter.action.type = FWP_ACTION_CALLOUT_INSPECTION;
 
-			dwFwAPiRetCode = ::FwpmFilterAdd0(m_hEngineHandle,
-								&filter,
-								NULL,
-								NULL);
+					dwFwAPiRetCode = ::FwpmFilterAdd0(m_hEngineHandle,
+										&filter,
+										NULL,
+										NULL);
+					*/
+
+					FWPM_FILTER0 Filter = { 0 };
+					FWPM_FILTER_CONDITION0 Condition = { 0 };
+					FWP_V4_ADDR_AND_MASK AddrMask = { 0 };
+
+					// Prepare filter condition.
+					Filter.subLayerKey = m_subLayerGUID;
+					Filter.displayData.name = L"FIREWALL_PLS_WORK";
+					Filter.flags = FWPM_FILTER_FLAG_NONE;
+					Filter.layerKey = FWPM_LAYER_INBOUND_TRANSPORT_V4;
+					Filter.action.type = FWP_ACTION_BLOCK;
+					Filter.weight.type = FWP_EMPTY;
+					Filter.filterCondition = &Condition;
+					Filter.numFilterConditions = 1;
+
+					// Remote IP address should match itFilters->uHexAddrToBlock.
+					Condition.fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
+					Condition.matchType = FWP_MATCH_EQUAL;
+					Condition.conditionValue.type = FWP_V4_ADDR_MASK;
+					Condition.conditionValue.v4AddrMask = &AddrMask;
+
+					// Add IP address to be blocked.
+					AddrMask.addr = itFilters->uHexAddrToBlock;
+
+					//printf("\nITFilters %x", &itFilters->uHexAddrToBlock);
+					AddrMask.mask = VISTA_SUBNET_MASK;
+
+					// Add filter condition to our interface. Save filter id in itFilters->u64VistaFilterId.
+					dwFwAPiRetCode = ::FwpmFilterAdd0(m_hEngineHandle,
+						&Filter,
+						NULL,
+						&(itFilters->u64VistaFilterId));
+				}
+			}
 		}
 	}
 	catch (...)
@@ -314,7 +365,7 @@ int main()
 	PacketFilter pktFilter;
 
 
-	//pktFilter.AddToBlockList("192.167.0.1");
+	pktFilter.AddToBlockList("192.168.1.1");
 
 	if (pktFilter.StartPacketSniffer())
 	{
