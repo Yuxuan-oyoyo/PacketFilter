@@ -21,7 +21,7 @@ PacketFilter::PacketFilter()
 	}
 	catch (...)
 	{
-		printf("\nPacketFilter instance created\n");
+		printf("\n 1. Instance of DebinPacketFilter created\n");
 	}
 }
 
@@ -43,7 +43,7 @@ PacketFilter::~PacketFilter()
 	ParseIPAddrString is a utility method
 	This method was not written by our team 
 */
-bool PacketFilter::ParseIPAddrString(char* szIpAddr, UINT nStrLen, BYTE* pbHostOrdr, UINT nByteLen, ULONG& uHexAddr)
+bool PacketFilter::ParseIPAddrString(const char* szIpAddr, UINT nStrLen, BYTE* pbHostOrdr, UINT nByteLen, ULONG& uHexAddr)
 {
 	bool bRet = true;
 	try
@@ -91,7 +91,7 @@ bool PacketFilter::ParseIPAddrString(char* szIpAddr, UINT nStrLen, BYTE* pbHostO
 
 // checkout difference in bool vs BOOL
 
-void PacketFilter::AddToBlockList(char* szIpAddrToBlock)
+void PacketFilter::AddToBlockList(const char* szIpAddrToBlock)
 {
 	try
 	{
@@ -128,7 +128,7 @@ DWORD PacketFilter::BindUnbindInterface(bool bBind)
 		{
 			// the handler returned from fwmpengineopen0 defined as the "interface"
 			// 2. Next interface must be bound to a sublayer that is attached to the engine using FwpmSubLayeradd0
-			printf("\nUnbind Break 1\n");
+
 			RPC_STATUS rpcStatus = { 0 };
 
 			// The FWPM_SUBLAYER0 structure stores the state associated with a sublayer.
@@ -188,9 +188,9 @@ DWORD PacketFilter::BindUnbindInterface(bool bBind)
 	}
 	catch(...)
 	{ 
-		printf("\nUnbind Break 6\n");
+
 	}
-	printf("\nUnbind Break 5: %X\n", dwFwAPIRETCode);
+
 	
 	return dwFwAPIRETCode;
 }
@@ -220,7 +220,7 @@ DWORD PacketFilter::CreateDeleteInterface(bool bCreate)
 				&session,
 				&m_hEngineHandle);
 
-			printf("\nCreateDeleteInterface (%d).\n", dwFwAPIRetCode);
+			// printf("\nCreateDeleteInterface (%d).\n", dwFwAPIRetCode);
 		}
 		else
 		{
@@ -239,7 +239,7 @@ DWORD PacketFilter::CreateDeleteInterface(bool bCreate)
 
 }
 	/*
-	AddRemoveFilter
+	AddTcpFilter skeleton
 	try
 		if(true)
 			add filters
@@ -248,70 +248,8 @@ DWORD PacketFilter::CreateDeleteInterface(bool bCreate)
 	catch
 	*/
 
-DWORD PacketFilter::AddRstFilter(bool bAdd)
-{
-	DWORD dwFwAPiRetCode = ERROR_BAD_COMMAND;
-	
-	try
-	{
-		if (bAdd)
-		{
-			if (m_lstFilters.size())
-			{
-				IPFILTERINFOLIST::iterator itFilters;
-				for (itFilters = m_lstFilters.begin(); itFilters != m_lstFilters.end(); itFilters++)
-				{
-					FWPM_FILTER0 Filter = { 0 };
-					FWPM_FILTER_CONDITION0 Condition = { 0 };
-					FWP_V4_ADDR_AND_MASK AddrMask = { 0 };
 
-
-
-					// Remote IP address should match itFilters->uHexAddrToBlock.
-					// conditions ok ready to go (tester lim)
-					Condition.fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
-					Condition.matchType = FWP_MATCH_EQUAL;
-					Condition.conditionValue.type = FWP_V4_ADDR_MASK;
-					Condition.conditionValue.v4AddrMask = &AddrMask;
-
-					// Prepare filter condition.
-					Filter.subLayerKey = m_subLayerGUID;
-					Filter.displayData.name = L"OUTBOUND RST FILTER";
-					// RD: filter_flag none just says that filter is not persistent
-					Filter.flags = FWPM_FILTER_FLAG_NONE;
-					Filter.layerKey = FWPM_LAYER_INBOUND_TRANSPORT_V4_DISCARD;
-					
-						Filter.action.type = FWP_ACTION_CALLOUT_TERMINATING;
-						Filter.weight.type = FWP_EMPTY;
-						Filter.filterCondition = &Condition;
-						Filter.numFilterConditions = 1;
-					
-					Filter.action.calloutKey = FWPM_CALLOUT_WFP_TRANSPORT_LAYER_V4_SILENT_DROP;
-
-
-					// Add IP address to be blocked.
-					AddrMask.addr = itFilters->uHexAddrToBlock;
-
-					//printf("\nITFilters %x", &itFilters->uHexAddrToBlock);
-					AddrMask.mask = VISTA_SUBNET_MASK;
-
-					// Add filter condition to our interface. Save filter id in itFilters->u64VistaFilterId.
-					dwFwAPiRetCode = ::FwpmFilterAdd0(m_hEngineHandle,
-						&Filter,
-						NULL,
-						&(itFilters->u64VistaFilterId));
-				}
-			}
-		}
-	}
-	catch (...)
-	{	}
-	
-	return dwFwAPiRetCode;
-
-}
-
-DWORD PacketFilter::AddRemoveFilter(bool bAdd)
+DWORD PacketFilter::AddTcpFilter(bool bAdd)
 {
 	DWORD dwFwAPiRetCode = ERROR_BAD_COMMAND;
 
@@ -351,7 +289,7 @@ DWORD PacketFilter::AddRemoveFilter(bool bAdd)
 
 					// Prepare filter condition.
 					Filter.subLayerKey = m_subLayerGUID;
-					Filter.displayData.name = L"FIREWALL_PLS_WORK";
+					Filter.displayData.name = L"CUSTOM_TCP_FILTER";
 					Filter.flags = FWPM_FILTER_FLAG_NONE;
 					Filter.layerKey = FWPM_LAYER_INBOUND_TRANSPORT_V4;
 					Filter.action.type = FWP_ACTION_BLOCK;
@@ -390,7 +328,128 @@ DWORD PacketFilter::AddRemoveFilter(bool bAdd)
 }
 
 
-BOOL PacketFilter::StartPacketSniffer()
+DWORD PacketFilter::AddRstFilter(bool bAdd)
+{
+	DWORD dwFwAPiRetCode = ERROR_BAD_COMMAND;
+
+	try
+	{
+		if (bAdd)
+		{
+			if (m_lstFilters.size())
+			{
+				IPFILTERINFOLIST::iterator itFilters;
+				for (itFilters = m_lstFilters.begin(); itFilters != m_lstFilters.end(); itFilters++)
+				{
+					FWPM_FILTER0 Filter = { 0 };
+					FWPM_FILTER_CONDITION0 Condition = { 0 };
+					FWP_V4_ADDR_AND_MASK AddrMask = { 0 };
+
+
+
+					// Remote IP address should match itFilters->uHexAddrToBlock.
+					// conditions ok ready to go (tester lim)
+					Condition.fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
+					Condition.matchType = FWP_MATCH_EQUAL;
+					Condition.conditionValue.type = FWP_V4_ADDR_MASK;
+					Condition.conditionValue.v4AddrMask = &AddrMask;
+
+					// Prepare filter condition.
+					Filter.subLayerKey = m_subLayerGUID;
+					Filter.displayData.name = L"CUSTOM_RST_FILTER";
+					// RD: filter_flag none just says that filter is not persistent
+					Filter.flags = FWPM_FILTER_FLAG_NONE;
+					Filter.layerKey = FWPM_LAYER_INBOUND_TRANSPORT_V4_DISCARD;
+
+					Filter.action.type = FWP_ACTION_CALLOUT_TERMINATING;
+					Filter.weight.type = FWP_EMPTY;
+					Filter.filterCondition = &Condition;
+					Filter.numFilterConditions = 1;
+
+					Filter.action.calloutKey = FWPM_CALLOUT_WFP_TRANSPORT_LAYER_V4_SILENT_DROP;
+
+
+					// Add IP address to be blocked.
+					AddrMask.addr = itFilters->uHexAddrToBlock;
+
+					//printf("\nITFilters %x", &itFilters->uHexAddrToBlock);
+					AddrMask.mask = VISTA_SUBNET_MASK;
+
+					// Add filter condition to our interface. Save filter id in itFilters->u64VistaFilterId.
+					dwFwAPiRetCode = ::FwpmFilterAdd0(m_hEngineHandle,
+						&Filter,
+						NULL,
+						&(itFilters->u64VistaFilterId));
+				}
+			}
+		}
+	}
+	catch (...)
+	{
+	}
+
+	return dwFwAPiRetCode;
+
+}
+
+
+DWORD PacketFilter::AddIcmpFilter(bool bAdd)
+{
+	DWORD dwFwAPiRetCode = ERROR_BAD_COMMAND;
+
+	try
+	{
+		if (bAdd)
+		{
+			if (m_lstFilters.size())
+			{
+				IPFILTERINFOLIST::iterator itFilters;
+				for (itFilters = m_lstFilters.begin(); itFilters != m_lstFilters.end(); itFilters++)
+				{
+
+					FWPM_FILTER0 Filter = { 0 };
+					FWPM_FILTER_CONDITION0 Condition = { 0 };
+					FWP_V4_ADDR_AND_MASK AddrMask = { 0 };
+
+					// Prepare filter condition.
+					Filter.subLayerKey = m_subLayerGUID;
+					Filter.displayData.name = L"CUSTOM_ICMP_FILTER";
+					Filter.flags = FWPM_FILTER_FLAG_NONE;
+					Filter.layerKey = FWPM_LAYER_OUTBOUND_ICMP_ERROR_V4;
+					Filter.action.type = FWP_ACTION_BLOCK;
+					Filter.weight.type = FWP_EMPTY;
+					Filter.filterCondition = &Condition;
+					Filter.numFilterConditions = 1;
+
+					// Remote IP address should match itFilters->uHexAddrToBlock.
+					Condition.fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
+					Condition.matchType = FWP_MATCH_EQUAL;
+					Condition.conditionValue.type = FWP_V4_ADDR_MASK;
+					Condition.conditionValue.v4AddrMask = &AddrMask;
+
+					// Add IP address to be blocked.
+					AddrMask.addr = itFilters->uHexAddrToBlock;
+
+					//printf("\nITFilters %x", &itFilters->uHexAddrToBlock);
+					AddrMask.mask = VISTA_SUBNET_MASK;
+
+					// Add filter condition to our interface. Save filter id in itFilters->u64VistaFilterId.
+					dwFwAPiRetCode = ::FwpmFilterAdd0(m_hEngineHandle,
+						&Filter,
+						NULL,
+						&(itFilters->u64VistaFilterId));
+				}
+			}
+		}
+	}
+	catch (...)
+	{
+	}
+
+	return dwFwAPiRetCode;
+}
+
+BOOL PacketFilter::StartPacketSniffer(bool tcp, bool rst, bool icmp)
 {
 
 	BOOL bStarted = FALSE;
@@ -403,9 +462,13 @@ BOOL PacketFilter::StartPacketSniffer()
 			// Bind to packet filter interface
 			if (BindUnbindInterface(true) == ERROR_SUCCESS)
 			{
-				printf("\Start Firewall 2\n");
-				AddRemoveFilter(true);
-				AddRstFilter(true);
+				printf("Start Firewall 2\n");
+				if (tcp)
+					AddTcpFilter(true);
+				if (rst)
+					AddRstFilter(true);
+				if (icmp)
+					AddIcmpFilter(true);
 				bStarted = TRUE;
 			}
 		}
@@ -423,20 +486,45 @@ BOOL PacketFilter::StopPacketSniffer()
 	return TRUE;
 }
 
-int main()
+int main(int argc, char** argv)
 {
-	printf("hello world\n");
-
-
+	if (argc <= 1) {
+		printf("We can have normal TCP block, RST block and ICMP block. \n\nPlease write" \
+			"DebinPacketFilter <ip address> [options] where options can be\n" \
+			" \n** Team was lazy, no error checking for ip, be careful ** \n" \
+			" \nDebinPacketFilter 192.168.13.37 -tcp -rst -icmp \n" \
+			"   -tcp   Normal TCP block\n" \
+			"   -rst   RST block\n" \
+			"   -icmp  ICMP block\n");
+		return 0;
+	}
+	// Didn't bother with error checking
+	char* ip;
+	bool tcp = false;
+	bool rst = false;
+	bool icmp = false;
+	ip = argv[1]; //no error checking
+	for (int i = 2; i < argc; i++) {
+		if (strcmp(argv[i], "-tcp") == 0) {
+			tcp = true;
+		}
+		else if (strcmp(argv[i], "-rst") == 0) {
+			rst = true;
+		}
+		else if (strcmp(argv[i], "-icmp") == 0) {
+			icmp = true;
+		}
+	}
+	printf("\nThe settings you have specified are: ip = %s, tcp = %d, rst = %d, icmp = %d\n", ip, tcp, rst, icmp);
 
 	PacketFilter pktFilter;
 
 
-	pktFilter.AddToBlockList("192.168.150.1");
+	pktFilter.AddToBlockList(ip);
 
-	if (pktFilter.StartPacketSniffer())
+	if (pktFilter.StartPacketSniffer(tcp, rst, icmp))
 	{
-		printf("\nNetwork Sniffer started.. \n");
+		printf("\nRunning DebinPacketFilter started..  game on nmap!\n");
 	}
 	else
 	{

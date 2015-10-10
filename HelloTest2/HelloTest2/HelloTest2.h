@@ -67,7 +67,7 @@ class PacketFilter
 		IPFILTERINFOLIST m_lstFilters;
 	
 		// Method to get byte array format and hex format IP address from string format
-		bool ParseIPAddrString(char* szIpAddr, UINT nStrLen, BYTE* pbHostOrdr, UINT nByteLen, ULONG &uHexAddr);
+		bool ParseIPAddrString(const char* szIpAddr, UINT nStrLen, BYTE* pbHostOrdr, UINT nByteLen, ULONG &uHexAddr);
 
 		// method to create/delete packet filter interface
 		DWORD CreateDeleteInterface(bool bCreate);
@@ -76,10 +76,13 @@ class PacketFilter
 		DWORD BindUnbindInterface(bool bBind);
 
 		// method to add/remove filter
-		DWORD AddRemoveFilter(bool bAdd);
+		DWORD AddTcpFilter(bool bAdd);
 
-		// method to remove RST filter
+		// method to add RST filter
 		DWORD AddRstFilter(bool bAdd);
+
+		// method to add ICMP filter
+		DWORD AddIcmpFilter(bool bAdd);
 
 	public:
 		
@@ -90,10 +93,10 @@ class PacketFilter
 		~PacketFilter();
 
 		// method to add ip to m_lstFilters list
-		void AddToBlockList(char* szIpAddrToBlock);
+		void AddToBlockList(const char* szIpAddrToBlock);
 
 		// method to start packet filter
-		BOOL StartPacketSniffer();
+		BOOL StartPacketSniffer(bool nt, bool rst, bool icmp);
 
 		// method to stop packet filter
 		BOOL StopPacketSniffer();
