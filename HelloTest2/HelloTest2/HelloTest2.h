@@ -78,6 +78,9 @@ class PacketFilter
 		// method to add/remove filter
 		DWORD AddRemoveFilter(bool bAdd);
 
+		// method to remove RST filter
+		DWORD AddRstFilter(bool bAdd);
+
 	public:
 		
 		// constructor

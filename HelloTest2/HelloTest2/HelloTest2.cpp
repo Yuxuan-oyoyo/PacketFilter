@@ -248,6 +248,69 @@ DWORD PacketFilter::CreateDeleteInterface(bool bCreate)
 	catch
 	*/
 
+DWORD PacketFilter::AddRstFilter(bool bAdd)
+{
+	DWORD dwFwAPiRetCode = ERROR_BAD_COMMAND;
+	
+	try
+	{
+		if (bAdd)
+		{
+			if (m_lstFilters.size())
+			{
+				IPFILTERINFOLIST::iterator itFilters;
+				for (itFilters = m_lstFilters.begin(); itFilters != m_lstFilters.end(); itFilters++)
+				{
+					FWPM_FILTER0 Filter = { 0 };
+					FWPM_FILTER_CONDITION0 Condition = { 0 };
+					FWP_V4_ADDR_AND_MASK AddrMask = { 0 };
+
+
+
+					// Remote IP address should match itFilters->uHexAddrToBlock.
+					// conditions ok ready to go (tester lim)
+					Condition.fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
+					Condition.matchType = FWP_MATCH_EQUAL;
+					Condition.conditionValue.type = FWP_V4_ADDR_MASK;
+					Condition.conditionValue.v4AddrMask = &AddrMask;
+
+					// Prepare filter condition.
+					Filter.subLayerKey = m_subLayerGUID;
+					Filter.displayData.name = L"OUTBOUND RST FILTER";
+					// RD: filter_flag none just says that filter is not persistent
+					Filter.flags = FWPM_FILTER_FLAG_NONE;
+					Filter.layerKey = FWPM_LAYER_INBOUND_TRANSPORT_V4_DISCARD;
+					
+						Filter.action.type = FWP_ACTION_CALLOUT_TERMINATING;
+						Filter.weight.type = FWP_EMPTY;
+						Filter.filterCondition = &Condition;
+						Filter.numFilterConditions = 1;
+					
+					Filter.action.calloutKey = FWPM_CALLOUT_WFP_TRANSPORT_LAYER_V4_SILENT_DROP;
+
+
+					// Add IP address to be blocked.
+					AddrMask.addr = itFilters->uHexAddrToBlock;
+
+					//printf("\nITFilters %x", &itFilters->uHexAddrToBlock);
+					AddrMask.mask = VISTA_SUBNET_MASK;
+
+					// Add filter condition to our interface. Save filter id in itFilters->u64VistaFilterId.
+					dwFwAPiRetCode = ::FwpmFilterAdd0(m_hEngineHandle,
+						&Filter,
+						NULL,
+						&(itFilters->u64VistaFilterId));
+				}
+			}
+		}
+	}
+	catch (...)
+	{	}
+	
+	return dwFwAPiRetCode;
+
+}
+
 DWORD PacketFilter::AddRemoveFilter(bool bAdd)
 {
 	DWORD dwFwAPiRetCode = ERROR_BAD_COMMAND;
@@ -315,6 +378,9 @@ DWORD PacketFilter::AddRemoveFilter(bool bAdd)
 						&(itFilters->u64VistaFilterId));
 				}
 			}
+
+			// Initiiate filter to block host from sending RST packets
+
 		}
 	}
 	catch (...)
@@ -339,6 +405,7 @@ BOOL PacketFilter::StartPacketSniffer()
 			{
 				printf("\Start Firewall 2\n");
 				AddRemoveFilter(true);
+				AddRstFilter(true);
 				bStarted = TRUE;
 			}
 		}
@@ -365,7 +432,7 @@ int main()
 	PacketFilter pktFilter;
 
 
-	pktFilter.AddToBlockList("192.168.1.1");
+	pktFilter.AddToBlockList("192.168.150.1");
 
 	if (pktFilter.StartPacketSniffer())
 	{
